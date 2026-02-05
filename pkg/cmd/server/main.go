@@ -294,7 +294,9 @@ func startWebServer(wg *sync.WaitGroup, entClient *ent.Client, redisClient *redi
 	}
 }
 
-func startPprofServer(ctx context.Context) {
+func startPprofServer(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
 	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
@@ -510,17 +512,16 @@ func run(cmd *cobra.Command, args []string) {
 	engineClient := engine.NewEngine(ctx, entClient, redisClient, taskRequestChan, taskResponseChan, workerStatusChan, kothTaskRequestChan, kothTaskResponseChan)
 
 	wg := &sync.WaitGroup{}
-	wg.Add(1)
+	wg.Add(2)
 
 	go startWebServer(wg, entClient, redisClient, engineClient, taskRequestChan, taskResponseChan, workerStatusChan)
 	go startRabbitMQServer(wg, cmd.Context(), taskRequestChan, taskResponseChan, workerStatusChan, kothTaskRequestChan, kothTaskResponseChan, redisClient, entClient)
 	if config.Pprof.Enabled {
-		go startPprofServer(ctx)
+		wg.Add(1)
+		go startPprofServer(ctx, wg)
 	}
 
 	wg.Wait()
-
-	ctx.Done()
 
 	logrus.Info("Server stopped")
 }
