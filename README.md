@@ -80,6 +80,13 @@ go tool pprof -http=:0 http://localhost:6060/debug/pprof/profile?seconds=30
 
 This opens the pprof UI in your browser. Use the **Flame Graph** view to analyze hotspots.
 
+> [!NOTE]
+> If your browser blocks the UI due to a `:0` redirect, specify an explicit host or port such as
+> `-http=127.0.0.1:0` (random port) or `-http=localhost:6061` (fixed port).
+>
+> If the flame graph view looks empty, ensure the server is under load during the capture window
+> (the UI only renders samples that were collected while profiling).
+
 ### Other useful profiles
 
 * Heap profile: `go tool pprof -http=:0 http://localhost:6060/debug/pprof/heap`
