@@ -57,3 +57,30 @@ docker compose build
 docker compose down
 docker compose up -d
 ```
+
+## Profiling with pprof flame graphs
+
+Scorify exposes an optional Go pprof server so you can capture CPU profiles and view flame graphs.
+
+### Enable the pprof server
+
+1. Set the environment variables (in `.env` or your deployment system):
+   - `PPROF_ENABLED=true`
+   - `PPROF_PORT=6060` (or any open port you prefer)
+2. If you are using Docker Compose, ensure the port is published (the default `docker-compose.yml` now publishes the pprof port).
+3. Restart the `scorify` service.
+
+### Capture a CPU profile and open the flame graph
+
+From your workstation (with Go installed), run:
+
+```
+go tool pprof -http=:0 http://localhost:6060/debug/pprof/profile?seconds=30
+```
+
+This opens the pprof UI in your browser. Use the **Flame Graph** view to analyze hotspots.
+
+### Other useful profiles
+
+* Heap profile: `go tool pprof -http=:0 http://localhost:6060/debug/pprof/heap`
+* Goroutine dump: `curl http://localhost:6060/debug/pprof/goroutine?debug=2`

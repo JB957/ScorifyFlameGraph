@@ -95,6 +95,12 @@ var (
 			Password string
 		}
 	}
+
+	// Pprof is the configuration for the pprof server
+	Pprof struct {
+		Enabled bool
+		Port    int
+	}
 )
 
 func InitMinion() {
@@ -136,6 +142,7 @@ func InitServer() {
 	postgres()
 	redis()
 	rabbitmqServer()
+	pprof()
 }
 
 func domain() {
@@ -230,6 +237,29 @@ func redis() {
 	Redis.Password = os.Getenv("REDIS_PASSWORD")
 	if Redis.Password == "" {
 		logrus.Fatal("REDIS_PASSWORD is not set")
+	}
+}
+
+func pprof() {
+	var err error
+
+	pprofEnabled := os.Getenv("PPROF_ENABLED")
+	if pprofEnabled != "" {
+		Pprof.Enabled, err = strconv.ParseBool(pprofEnabled)
+		if err != nil {
+			logrus.WithError(err).Fatal("failed to parse PPROF_ENABLED")
+		}
+	}
+
+	pprofPort := os.Getenv("PPROF_PORT")
+	if pprofPort == "" {
+		Pprof.Port = 6060
+		return
+	}
+
+	Pprof.Port, err = strconv.Atoi(pprofPort)
+	if err != nil {
+		logrus.WithError(err).Fatal("failed to parse PPROF_PORT")
 	}
 }
 
