@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"sync"
 	"time"
 
@@ -292,6 +294,40 @@ func startWebServer(wg *sync.WaitGroup, entClient *ent.Client, redisClient *redi
 	}
 }
 
+func startPprofServer(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	server := &http.Server{
+		Addr:              fmt.Sprintf(":%d", config.Pprof.Port),
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	go func() {
+		<-ctx.Done()
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			logrus.WithError(err).Error("failed to shutdown pprof server")
+		}
+	}()
+
+	logrus.Printf("Starting pprof server on http://%s:%d", config.Domain, config.Pprof.Port)
+
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logrus.WithError(err).Error("failed to start pprof server")
+	}
+}
+
 func startRabbitMQServer(
 	wg *sync.WaitGroup,
 	ctx context.Context,
@@ -476,14 +512,16 @@ func run(cmd *cobra.Command, args []string) {
 	engineClient := engine.NewEngine(ctx, entClient, redisClient, taskRequestChan, taskResponseChan, workerStatusChan, kothTaskRequestChan, kothTaskResponseChan)
 
 	wg := &sync.WaitGroup{}
-	wg.Add(1)
+	wg.Add(2)
 
 	go startWebServer(wg, entClient, redisClient, engineClient, taskRequestChan, taskResponseChan, workerStatusChan)
 	go startRabbitMQServer(wg, cmd.Context(), taskRequestChan, taskResponseChan, workerStatusChan, kothTaskRequestChan, kothTaskResponseChan, redisClient, entClient)
+	if config.Pprof.Enabled {
+		wg.Add(1)
+		go startPprofServer(ctx, wg)
+	}
 
 	wg.Wait()
-
-	ctx.Done()
 
 	logrus.Info("Server stopped")
 }
