@@ -76,6 +76,7 @@ From your workstation (with Go installed), run:
 
 ```
 go tool pprof -http=localhost:0 http://localhost:6060/debug/pprof/profile?seconds=30
+go tool pprof -http=:0 http://localhost:6060/debug/pprof/profile?seconds=30
 ```
 
 This opens the pprof UI in your browser. Use the **Flame Graph** view to analyze hotspots.
